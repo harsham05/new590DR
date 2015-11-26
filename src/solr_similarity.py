@@ -49,22 +49,25 @@ if args.file and args.solrURL:
     total_num_features = len(union_feature_names)    # 1660
     resemblance_scores = {} 
     query_Error = {}
-    update_Error = {}
 
     session = requests.Session()
     session.auth = (os.environ["SOLR_SIM_USER"], os.environ["SOLR_SIM_PASS"])
     solr = Solr(args.solrURL, make_request=session, version=4)    
-    
+
     fileChunkSize = 0
 
     try:        #print "\t Processing Image IDs in provided 50k line sized chunked file:\t", args.file, "........."
         inF = open(args.file, 'r')
+
+        bufferDocs = []
         
         for docID in inF:
             fileChunkSize += 1
 
-            docID = docID.strip()  #query document in Solr & calculate Score                       
-            response = solr.search(q=docID, rows=1) 
+            docID = docID.strip()
+            queryDocID = 'id:' + '"' + docID + '"'   #query document in Solr & calculate Score                
+
+            response = solr.search(q=queryDocID)            
 
             if response.raw_content['responseHeader']['status'] == 0:     #query returned no errors
 
@@ -79,12 +82,9 @@ if args.file and args.solrURL:
                     # perform update here, 
                     document["metadataSimilarityScore_s"] = float(len(overlap))/total_num_features
 
-                    if args.commit: 
-                        x = solr.update(response.documents, commit=True)
-
-                        if x.raw_content['responseHeader']['status'] != 0:      #update was not successful
-                            update_Error[docID] = x.raw_content['responseHeader']['status']   
-
+                    if args.commit:     #buffer docs to be committed at the end
+                        bufferDocs.append(document)
+                        
                     else:
                         if args.outputDir:
 
@@ -110,11 +110,16 @@ if args.file and args.solrURL:
             print "Failed Solr Core queries, Documents IDs along with status codes:"
             pprint(query_Error, width=1)
         
-        if args.commit:
-            print "Successful Solr updates:\t", (fileChunkSize-len(update_Error)), "/", fileChunkSize
-            if len(update_Error) > 0:
-                print "Failed Solr Core commits, Documents IDs along with status codes:"
-                pprint(update_Error, width=1)
+        if args.commit:     #perform commit in the end
+            print "Performing Solr Commit Now for all buffered documents of chunkSize:\t", fileChunkSize
+
+            x = solr.update(bufferDocs, commit=True)
+
+            if x.raw_content['responseHeader']['status'] != 0: 
+                print "Solr Commit Failed !!!! Error Status code: ", x.raw_content['responseHeader']['status']          
+            else:
+                print "Awesome!! Solr Commit was a Success for chunkSize:\t", fileChunkSize
+                
 
         #pprint(resemblance_scores)     
         
