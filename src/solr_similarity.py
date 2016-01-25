@@ -40,11 +40,11 @@ if args.file and args.solrURL:
     try:  #validating luke in turn validates solrURL
         solr_metadata_dump = requests.get(lukeURL).json()
     except:
-        print "\n\tUsage Error: please enter a Valid solrURL in the below format"        
+        print "\n\tUsage Error: please enter a Valid solrURL in the below format"
         print "\tEg: https://localhost:8983/solr/core1\n"
         sys.exit()
    
-    union_feature_names = set(solr_metadata_dump["fields"].keys())   #print(union_feature_names) 
+    union_feature_names = set(solr_metadata_dump["fields"].keys())   #print(union_feature_names)
 
     total_num_features = len(union_feature_names)    # 1660
     resemblance_scores = {} 
