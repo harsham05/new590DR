@@ -15,7 +15,7 @@ def main():
     if args.solrURL and args.outFile:              # http://imagecat.dyndns.org/solr/dhsnewimagecatdev        
         with open(args.outFile, 'w') as outF:
 
-            lukeURL = "http://" + os.environ["SOLR_SIM_USER"]+":"+os.environ["SOLR_SIM_PASS"]+ "@" + args.solrURL.split("://")[-1].rstrip('/') + "/admin/luke?fl=id&numTerms=1000&wt=json"            
+            lukeURL = "http://" + os.environ["SOLR_SIM_USER"]+":"+os.environ["SOLR_SIM_PASS"]+ "@" + args.solrURL.split("://")[-1].rstrip('/') + "/admin/luke?fl=id&numTerms=1000&wt=json"
             
             try:
                 lukeResponse = requests.get(lukeURL, verify=False).json()

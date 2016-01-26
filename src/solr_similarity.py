@@ -25,7 +25,7 @@ Calculates Metadata similarity scores for Chunked Image IDs/files & updates them
 i.e script just iterates through each distinct Chunked File containing Image IDs
 '''
 
-parser = argparse.ArgumentParser(description='Solr-similarity-OODT-ImageCat-integration')
+parser = argparse.ArgumentParser(description='Jaccard Solr Metadata Similarity')
 parser.add_argument('-f', '--file', required=True, help='path to file/Chunk containing Image IDs')
 parser.add_argument('--solrURL', required=True, help='Solr Core localhost complete URL or Solr Core REST endpoint')
 
@@ -35,7 +35,7 @@ args = parser.parse_args()
 
 if args.file and args.solrURL:
     
-    lukeURL = "https://"+os.environ["SOLR_SIM_USER"]+":"+os.environ["SOLR_SIM_PASS"]+ "@" + args.solrURL.split("://")[-1] + "/admin/luke?numTerms=0&wt=json"
+    lukeURL = "https://"+os.environ["SOLR_SIM_USER"]+":"+os.environ["SOLR_SIM_PASS"]+ "@" + args.solrURL.split("://")[-1].rstrip('/') + "/admin/luke?numTerms=0&wt=json"
 
     try:  #validating luke in turn validates solrURL
         solr_metadata_dump = requests.get(lukeURL).json()
