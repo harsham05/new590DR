@@ -21,109 +21,95 @@ from pprint import pprint
 import os, sys, requests, json, time, argparse
 from mysolr import Solr
 '''
-Calculates Metadata similarity scores for Chunked Image IDs/files & updates them as dynamic fields into Solr Index
-i.e script just iterates through each distinct Chunked File containing Image IDs
+    Calculates Metadata similarity scores for Chunked Image IDs/files & updates them as dynamic fields into Solr Index
+    i.e script just iterates through each distinct Chunked File containing Image IDs
+    **can be parallelized through multiple Python processes by leveraging chunked files**
 '''
+def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
 
-parser = argparse.ArgumentParser(description='Jaccard Solr Metadata Similarity')
-parser.add_argument('-f', '--file', required=True, help='path to file/Chunk containing Image IDs')
-parser.add_argument('--solrURL', required=True, help='Solr Core localhost complete URL or Solr Core REST endpoint')
-
-parser.add_argument('--commit', action='store_true', help='Include *commit Flag option* to commit calculated metadata similarity scores to Solr Index')
-parser.add_argument('--outputDir', help='Output Directory Path to store updated JSON Solr Response documents if commit is not required')
-args = parser.parse_args()
-
-if args.file and args.solrURL:
+    total_num_features = len(union_feature_names)
+    resemblance_scores = {}                             
+    query_Error = {}
+    bufferDocs = []
     
-    lukeURL = "https://"+os.environ["SOLR_SIM_USER"]+":"+os.environ["SOLR_SIM_PASS"]+ "@" + args.solrURL.split("://")[-1].rstrip('/') + "/admin/luke?numTerms=0&wt=json"
+    with open(chunkFile, 'r') as inF:
+        for docID in inF:
+            docID = docID.strip()
+            response = solr.search(q='id:"{0}"'.format(docID))
+
+            if response.raw_content['responseHeader']['status'] == 0:                       #query returned no errors
+
+                document = response.documents[0]
+                if document["id"] == docID:                                                 #Solr query is a successful match
+                    overlap = {}
+                    overlap = set(document.keys()) & set(union_feature_names)
+
+                    resemblance_scores[document["id"]] = float(len(overlap))/total_num_features
+                    
+                    document["metadataSimilarityScore_f_md"] = float(len(overlap))/total_num_features      # perform update here
+                    
+                    if commitFlag:     #buffer docs to be committed at the end
+                        bufferDocs.append(document)
+                        
+                    else:
+                        if outputDir:
+                            docName = document["id"].split("/")[-1].split(".")[0]                       #parse to obtain only filename
+                            updatedFile = os.path.abspath(outputDir) + '/' + docName + ".json"
+                            with open(updatedFile, 'w') as tempF:
+                                json.dump(document, tempF, indent=4, sort_keys=True, separators=(',', ': '))
+
+                        else:
+                            sys.exit("\n\tUsage Error: please enter a output Directory\n")
+            else:
+                query_Error[docID] = response.raw_content['responseHeader']['status']
+
+    print "Successful Solr Core queries:\t", len(resemblance_scores)
+
+    if len(query_Error) > 0:
+        print "Failed Solr Core queries, Documents IDs along with status codes:"
+        pprint(query_Error, width=1)
+        
+    if commitFlag:     #perform commit in the end
+        x = solr.update(bufferDocs, commit=True)
+
+        if x.raw_content['responseHeader']['status'] != 0:
+            print "Solr Commit Failed !!!! Error Status code: ", x.raw_content['responseHeader']['status']
+        else:
+            print "Awesome!! Solr Commit was a Success"
+        
+    pprint(resemblance_scores)
+
+def solr_similarity(chunkFile, solrURL, httpType, commitFlag, outputDir):
+
+    lukeURL = "{0}://{1}:{2}@{3}/admin/luke?numTerms=0&wt=json".format(httpType, os.environ["SOLR_SIM_USER"], os.environ["SOLR_SIM_PASS"], solrURL.split("://")[-1].rstrip('/'))    
 
     try:  #validating luke in turn validates solrURL
         solr_metadata_dump = requests.get(lukeURL).json()
     except:
         print "\n\tUsage Error: please enter a Valid solrURL in the below format"
-        print "\tEg: https://localhost:8983/solr/core1\n"
+        print "\tEg: {0}://localhost:8983/solr/core1\n".format(httpType)
         sys.exit()
-   
-    union_feature_names = set(solr_metadata_dump["fields"].keys())   #print(union_feature_names)
 
-    total_num_features = len(union_feature_names)    # 1660
-    resemblance_scores = {} 
-    query_Error = {}
+    union_feature_names = set(solr_metadata_dump["fields"].keys())
 
     session = requests.Session()
     session.auth = (os.environ["SOLR_SIM_USER"], os.environ["SOLR_SIM_PASS"])
-    solr = Solr(args.solrURL, make_request=session, version=4)    
+    solr = Solr(solrURL, make_request=session, version=4)
 
-    fileChunkSize = 0
-
-    try:        #print "\t Processing Image IDs in provided 50k line sized chunked file:\t", args.file, "........."
-        inF = open(args.file, 'r')
-
-        bufferDocs = []
-        
-        for docID in inF:
-            fileChunkSize += 1
-
-            docID = docID.strip()
-            queryDocID = 'id:' + '"' + docID + '"'   #query document in Solr & calculate Score                
-
-            response = solr.search(q=queryDocID)            
-
-            if response.raw_content['responseHeader']['status'] == 0:     #query returned no errors
-
-                document = response.documents[0]
-                if document["id"] == docID:       # Solr query is a successful match
-                    
-                    overlap = {}
-                    overlap = set(document.keys()) & set(union_feature_names)
-
-                    resemblance_scores[document["id"]] = float(len(overlap))/total_num_features
-
-                    # perform update here, 
-                    document["metadataSimilarityScore_s"] = float(len(overlap))/total_num_features
-
-                    if args.commit:     #buffer docs to be committed at the end
-                        bufferDocs.append(document)
-                        
-                    else:
-                        if args.outputDir:
-
-                            docName = document["id"].split("/")[-1].split(".")[0]          #parse to obtain only filename
-                     
-                            updatedFile = os.path.abspath(args.outputDir) + '/' + docName + ".json"
-
-                            tempF = open(updatedFile, 'w')
-                            json.dump(document, tempF, indent=4, sort_keys=True, separators=(',', ': '))
-                            tempF.close()
-
-                        else:                           
-                            sys.exit("\n\tUsage Error: please enter a output Directory\n")
-                                                
-            else:
-                query_Error[docID] = response.raw_content['responseHeader']['status']
-          
-        inF.close()        
-
-        print "Successful Solr Core queries:\t", len(resemblance_scores), "/", fileChunkSize   #(fileChunkSize-len(query_Error))
-
-        if len(query_Error) > 0:
-            print "Failed Solr Core queries, Documents IDs along with status codes:"
-            pprint(query_Error, width=1)
-        
-        if args.commit:     #perform commit in the end
-            print "Performing Solr Commit Now for all buffered documents of chunkSize:\t", fileChunkSize
-
-            x = solr.update(bufferDocs, commit=True)
-
-            if x.raw_content['responseHeader']['status'] != 0: 
-                print "Solr Commit Failed !!!! Error Status code: ", x.raw_content['responseHeader']['status']          
-            else:
-                print "Awesome!! Solr Commit was a Success for chunkSize:\t", fileChunkSize
-                
-
-        #pprint(resemblance_scores)     
-        
-            
+    try:        
+        compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir)
     except SystemExit as e:
         print e, "terminating..........."        #print "\nError: not a valid file, please check if file exists"
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Jaccard Solr Metadata Similarity')
+    parser.add_argument('-f', '--file', required=True, help='path to file/Chunk containing Image IDs')
+    parser.add_argument('--solrURL', required=True, help='Solr Core localhost complete URL or Solr Core REST endpoint')
+    parser.add_argument('--type', required=True, help='http or https')
+    parser.add_argument('--commit', action='store_true', help='Include *commit Flag option* to commit calculated metadata similarity scores to Solr Index')
+    parser.add_argument('--outputDir', help='Output Directory Path to store updated JSON Solr Response documents if commit is not required')
+    args = parser.parse_args()
+
+    if args.file and args.solrURL and args.type:
+        solr_similarity(args.file, args.solrURL, args.type, args.commit, args.outputDir)
