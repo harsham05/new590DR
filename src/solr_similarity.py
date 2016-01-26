@@ -70,7 +70,15 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
         pprint(query_Error, width=1)
         
     if commitFlag:     #perform commit in the end
-        x = solr.update(bufferDocs, commit=True)
+        atomic_docs = []
+        for document in bufferDocs:
+            
+            doc_id_score = {"id": document["id"],
+                            "metadataSimilarityScore_f_md" : {"set" : document["metadataSimilarityScore_f_md"]}
+            }
+            atomic_docs.append(doc_id_score)            
+
+        x = solr.update(atomic_docs, commit=True)
 
         if x.raw_content['responseHeader']['status'] != 0:
             print "Solr Commit Failed !!!! Error Status code: ", x.raw_content['responseHeader']['status']

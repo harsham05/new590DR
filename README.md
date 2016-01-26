@@ -13,10 +13,10 @@
     export SOLR_SIM_PASS=""
     ```
 
-3. Define Dynamic field in Solr Schema
+3. Define static field in Solr Schema
     
     ```
-    <dynamicField name="*_f_md" type="float" default="0.0" indexed="true" stored="true" multiValued="false"/>
+    <field name="metadataSimilarityScore_f_md" type="float" default="0.0" indexed="true" stored="true" multiValued="false"/>  
     ```
 
 ### Usage
