@@ -24,6 +24,7 @@ from mysolr import Solr
     Calculates Metadata similarity scores for Chunked Image IDs/files & updates them as dynamic fields into Solr Index
     i.e script just iterates through each distinct Chunked File containing Image IDs
     **can be parallelized through multiple Python processes by leveraging chunked files**
+    chunked File size determines the buffer size before commit is performed
 '''
 def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
 
@@ -68,15 +69,15 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
     if len(query_Error) > 0:
         print "Failed Solr Core queries, Documents IDs along with status codes:"
         pprint(query_Error, width=1)
-        
-    if commitFlag:     #perform commit in the end
+
+    if commitFlag:                          #perform commit in the end
         atomic_docs = []
         for document in bufferDocs:
-            
+        
             doc_id_score = {"id": document["id"],
                             "metadataSimilarityScore_f_md" : {"set" : document["metadataSimilarityScore_f_md"]}
             }
-            atomic_docs.append(doc_id_score)            
+            atomic_docs.append(doc_id_score)
 
         x = solr.update(atomic_docs, commit=True)
 
@@ -85,7 +86,7 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
         else:
             print "Awesome!! Solr Commit was a Success"
         
-    pprint(resemblance_scores)
+    #pprint(resemblance_scores)
 
 def solr_similarity(chunkFile, solrURL, httpType, commitFlag, outputDir):
 
