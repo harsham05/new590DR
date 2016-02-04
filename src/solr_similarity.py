@@ -28,8 +28,7 @@ from mysolr import Solr
 '''
 def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
 
-    total_num_features = len(union_feature_names)
-    resemblance_scores = {}                             
+    total_num_features = len(union_feature_names)       #resemblance_scores = {}                             
     query_Error = {}
     bufferDocs = []
     
@@ -41,16 +40,16 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
             if response.raw_content['responseHeader']['status'] == 0:                       #query returned no errors
 
                 document = response.documents[0]
-                if document["id"] == docID:                                                 #Solr query is a successful match
-                    overlap = {}
+                if document["id"] == docID:                                                 #Solr query is a successful match                    
+                    
                     overlap = set(document.keys()) & set(union_feature_names)
+                    resemblance_score = float(len(overlap))/total_num_features
 
-                    resemblance_scores[document["id"]] = float(len(overlap))/total_num_features
-                    
-                    document["metadataSimilarityScore_d_md"] = float(len(overlap))/total_num_features      # perform update here
-                    
-                    if commitFlag:     #buffer docs to be committed at the end
-                        bufferDocs.append(document)
+                    if commitFlag:                                                      #buffer docs to be committed at the end                        
+                        doc_id_score = { "id": docID,
+                                        "metadataSimilarityScore_d_md" : {"set" : resemblance_score}
+                                        }
+                        bufferDocs.append(doc_id_score)
                         
                     else:
                         if outputDir:
@@ -64,22 +63,14 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
             else:
                 query_Error[docID] = response.raw_content['responseHeader']['status']
 
-    print "Successful Solr Core queries:\t", len(resemblance_scores)
+    print "Successful Solr Core queries:\t", len(bufferDocs)
 
     if len(query_Error) > 0:
         print "Failed Solr Core queries, Documents IDs along with status codes:"
         pprint(query_Error, width=1)
 
-    if commitFlag:                          #perform commit in the end
-        atomic_docs = []
-        for document in bufferDocs:
-        
-            doc_id_score = {"id": document["id"],
-                            "metadataSimilarityScore_d_md" : {"set" : document["metadataSimilarityScore_d_md"]}
-            }
-            atomic_docs.append(doc_id_score)
-
-        x = solr.update(atomic_docs, commit=True)
+    if commitFlag:                          #perform commit in the end      
+        x = solr.update(bufferDocs, commit=True)
 
         if x.raw_content['responseHeader']['status'] != 0:
             print "Solr Commit Failed !!!! Error Status code: ", x.raw_content['responseHeader']['status']
