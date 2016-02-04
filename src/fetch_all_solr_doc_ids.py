@@ -25,17 +25,16 @@ def lukeHandler(solrURL, outF):
 
 def solrHandler(solrURL, outF, startRow):
 
-    solrURL = "http://{0}:{1}@{2}/select?q=*:*&fl=id&start={3}&rows=50000&wt=json".format(os.environ["SOLR_SIM_USER"], os.environ["SOLR_SIM_PASS"], solrURL.split("://")[-1].rstrip('/'), startRow)
+    solrURL = "http://{0}:{1}@{2}/select?q=*:*&fl=id&start={3}&rows=500000&wt=json".format(os.environ["SOLR_SIM_USER"], os.environ["SOLR_SIM_PASS"], solrURL.split("://")[-1].rstrip('/'), startRow)
 
-    print(solrURL)
+    #print(solrURL)
 
-    #solrResponse = requests.get(solrURL, verify=False).json()
+    solrResponse = requests.get(solrURL, verify=False).json()
 
+    if solrResponse['responseHeader']['status'] == 0:
+        for document in solrResponse['response']['docs']:
+            print(document["id"], file=outF)
     
-    
-
-    
-
 
 
 
@@ -44,11 +43,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="fetch all document ids efficiently from Solr index")
     parser.add_argument('--solrURL', required=True, help="Solr Core URL")    
     #parser.add_argument('--outFile', required=True, help="text file containing doc IDs")       and args.outFile 
-    parser.add_argument('--startRow', required=True, help="start index, 0, 50000, 100000, etc")
+    parser.add_argument('--startRow', required=True, help="start index, 0, 500000, 1000000, etc")
     args = parser.parse_args()
 
     if args.solrURL and args.startRow:              # http://imagecat.dyndns.org/solr/dhsnewimagecatdev        
         
-        outStr = "doc_ids_{0}_50000.txt".format(args.startRow)
+        outStr = "doc_ids_{0}.txt".format(args.startRow)
         with open(outStr, 'w') as outF:
             solrHandler(args.solrURL, outF, args.startRow)
