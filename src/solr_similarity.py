@@ -47,7 +47,7 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
 
                     resemblance_scores[document["id"]] = float(len(overlap))/total_num_features
                     
-                    document["metadataSimilarityScore_f_md"] = float(len(overlap))/total_num_features      # perform update here
+                    document["metadataSimilarityScore_d_md"] = float(len(overlap))/total_num_features      # perform update here
                     
                     if commitFlag:     #buffer docs to be committed at the end
                         bufferDocs.append(document)
@@ -75,7 +75,7 @@ def compute_scores(chunkFile, solr, union_feature_names, commitFlag, outputDir):
         for document in bufferDocs:
         
             doc_id_score = {"id": document["id"],
-                            "metadataSimilarityScore_f_md" : {"set" : document["metadataSimilarityScore_f_md"]}
+                            "metadataSimilarityScore_d_md" : {"set" : document["metadataSimilarityScore_d_md"]}
             }
             atomic_docs.append(doc_id_score)
 

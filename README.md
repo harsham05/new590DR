@@ -14,9 +14,9 @@
     ```
 
 3. Define static field in Solr Schema
-    
+
     ```
-    <field name="metadataSimilarityScore_f_md" type="float" default="0.0" indexed="true" stored="true" multiValued="false"/>  
+    <field name="metadataSimilarityScore_d_md" type="float" default="0.0" indexed="true" stored="true" multiValued="false"/>  
     ```
 
 ### Usage
