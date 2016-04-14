@@ -14,7 +14,7 @@ def atomicUpdate(chunkFile, solrURL):
             docID = docID.strip()
 
             delta_update = { "id": docID,
-                              "dataSource_s_md": "google"} ## Caution change this value
+                              "dataSource_s_md": {"set": "ice"} } ## Caution change this value
 
             bufferDocs.append(delta_update)
 
@@ -34,6 +34,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DHS Atomic Update")
     parser.add_argument('-f', '--file', required=True, help='path to file/Chunk containing Image IDs')
     parser.add_argument('--solrURL', required=True, help='Solr Core URL')
+
+    # http://localhost:8983/solr/DHS/
+
     args = parser.parse_args()
 
     if args.file and args.solrURL:
